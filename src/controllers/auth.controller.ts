@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { prisma } from "../lib/prisma";
-import { mailer } from "../services/mail";
+import { mailer } from "../services/mailer";
 
 
 // ================= REGISTER =================
@@ -95,7 +95,7 @@ export async function forgotPassword(req: Request, res: Response) {
     }
 
     // 🔥 token curto amigável
-    const token = crypto.randomBytes(3).toString("hex").toUpperCase(); 
+    const token = crypto.randomBytes(3).toString("hex").toUpperCase();
     // exemplo: A9F3B2
 
     const expires = new Date(Date.now() + 1000 * 60 * 15); // 15 min
@@ -109,7 +109,6 @@ export async function forgotPassword(req: Request, res: Response) {
     });
 
     await mailer.sendMail({
-      from: `"App Consultor" <${process.env.MAIL_USER}>`,
       to: user.email,
       subject: "Recuperação de senha",
       html: `
