@@ -4,7 +4,7 @@ import cors from "cors";
 
 import authRoutes from "./routes/auth.routes";
 import adminRoutes from "./routes/admin.routes";
-import clienteRoutes from "./routes/cliente.routes"; 
+import clienteRoutes from "./routes/cliente.routes";
 import consultorRoutes from "./routes/consultor.routes";
 import { checkPayments } from "./jobs/payment.job";
 import healthRoutes from "./routes/health.routes";
@@ -14,20 +14,32 @@ checkPayments();
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+/* =========================
+   CONFIGURAÇÕES GERAIS
+========================= */
 
-// rotas
+app.use(cors());
+
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+/* =========================
+   ROTAS
+========================= */
+
 app.use("/auth", authRoutes);
 app.use("/admin", adminRoutes);
-app.use("/clientes", clienteRoutes); 
+app.use("/clientes", clienteRoutes);
 app.use("/consultores", consultorRoutes);
-app.use(healthRoutes);
 app.use("/users", userRoutes);
+app.use(healthRoutes);
 
-app.listen(3333, () => {
-  console.log("🔥 Backend rodando em http://localhost:3333");
+/* =========================
+   PORTA DINÂMICA (RENDER)
+========================= */
+
+const PORT = process.env.PORT || 3333;
+
+app.listen(PORT, () => {
+  console.log(`🔥 Backend rodando na porta ${PORT}`);
 });
-
-
-
