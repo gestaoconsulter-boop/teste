@@ -39,7 +39,15 @@ export async function me(req: Request, res: Response) {
 export async function updateMe(req: Request, res: Response) {
   try {
     const userId = req.user!.id;
-    const { nome, senhaAtual, novaSenha } = req.body;
+
+    const {
+      nome,
+      email,
+      cpf,
+      proximoPagamento,
+      senhaAtual,
+      novaSenha,
+    } = req.body;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -55,24 +63,38 @@ export async function updateMe(req: Request, res: Response) {
       dataToUpdate.nome = String(nome);
     }
 
-    // 🔥 SE VEIO IMAGEM NOVA
+    if (email !== undefined) {
+      dataToUpdate.email = String(email);
+    }
+
+    if (cpf !== undefined) {
+      dataToUpdate.cpf = String(cpf);
+    }
+
+    if (proximoPagamento !== undefined) {
+      dataToUpdate.proximoPagamento = new Date(proximoPagamento);
+    }
+
+    // 🔥 IMAGEM
     if (req.file) {
-      // 🔥 APAGA A ANTIGA PRIMEIRO
       if (user.imagemUrl) {
         await deleteImageFromFirebase(user.imagemUrl);
       }
 
       const imagemUrl = await uploadImageToFirebase(req.file);
-
       dataToUpdate.imagemUrl = imagemUrl;
     }
 
+    // 🔥 ALTERAÇÃO DE SENHA
     if (novaSenha) {
       if (!senhaAtual) {
         return res.status(400).json({ error: "Senha atual é obrigatória" });
       }
 
-      const senhaCorreta = await bcrypt.compare(senhaAtual, user.senha);
+      const senhaCorreta = await bcrypt.compare(
+        senhaAtual,
+        user.senha
+      );
 
       if (!senhaCorreta) {
         return res.status(400).json({ error: "Senha atual incorreta" });
@@ -92,6 +114,7 @@ export async function updateMe(req: Request, res: Response) {
         id: true,
         nome: true,
         email: true,
+        cpf: true,
         role: true,
         status: true,
         proximoPagamento: true,
