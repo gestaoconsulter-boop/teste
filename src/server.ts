@@ -18,7 +18,17 @@ const app = express();
    CONFIGURAÇÕES GERAIS
 ========================= */
 
-app.use(cors());
+// 🔥 CORS CONFIGURADO CORRETAMENTE
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+// 🔥 LIBERA PREFLIGHT (ESSENCIAL)
+app.options("*", cors());
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
