@@ -52,6 +52,9 @@ export async function createCliente(req: Request, res: Response) {
     const { nome, telefone, cpf, rg, userId } = req.body;
     const loggedUser = req.user!;
 
+    console.log("📦 BODY:", req.body);           // 🔥 debug
+    console.log("📸 FILE:", req.file);           // 🔥 debug
+
     if (!nome) {
       return res.status(400).json({ error: "Nome é obrigatório" });
     }
@@ -59,7 +62,13 @@ export async function createCliente(req: Request, res: Response) {
     let imagemUrl: string | undefined;
 
     if (req.file) {
+      console.log("🚀 Enviando imagem pro Firebase..."); // 🔥 debug
+
       imagemUrl = await uploadImageToFirebase(req.file);
+
+      console.log("✅ URL GERADA:", imagemUrl); // 🔥 debug
+    } else {
+      console.log("❌ Nenhuma imagem recebida"); // 🔥 debug
     }
 
     const ownerId =
