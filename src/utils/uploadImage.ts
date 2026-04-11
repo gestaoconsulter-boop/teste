@@ -16,9 +16,10 @@ export async function uploadImageToFirebase(file: Express.Multer.File) {
       },
     });
 
-    await fileUpload.makePublic();
+    // 🔥 GERA URL DIRETA SEM depender de makePublic
+    const url = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
 
-    return fileUpload.publicUrl();
+    return url;
   } catch (error) {
     console.error("ERRO FIREBASE UPLOAD:", error);
     throw error;

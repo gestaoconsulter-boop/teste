@@ -3,6 +3,46 @@ import { prisma } from "../lib/prisma";
 import bcrypt from "bcrypt";
 import { uploadImageToFirebase } from "../utils/uploadImage";
 import { deleteImageFromFirebase } from "../utils/deleteImage";
+import crypto from "crypto";
+
+/* =========================
+   🔐 CRIPTO
+========================= */
+
+const algorithm = "aes-256-cbc";
+const secret = process.env.CRYPTO_SECRET || "chave-super-secreta";
+
+const key = crypto.createHash("sha256").update(secret).digest();
+
+function encrypt(text: string) {
+  if (!text) return text;
+
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+
+  let encrypted = cipher.update(text, "utf8", "hex");
+  encrypted += cipher.final("hex");
+
+  return iv.toString("hex") + ":" + encrypted;
+}
+
+function decrypt(hash: string) {
+  try {
+    if (!hash || !hash.includes(":")) return hash;
+
+    const [ivHex, encryptedText] = hash.split(":");
+
+    const iv = Buffer.from(ivHex, "hex");
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+
+    let decrypted = decipher.update(encryptedText, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+
+    return decrypted;
+  } catch {
+    return hash;
+  }
+}
 
 /**
  * GET — dados do usuário logado
@@ -15,6 +55,7 @@ export async function me(req: Request, res: Response) {
         id: true,
         nome: true,
         email: true,
+        cpf: true,
         role: true,
         status: true,
         proximoPagamento: true,
@@ -25,7 +66,13 @@ export async function me(req: Request, res: Response) {
 
     if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
 
-    return res.json(user);
+    return res.json({
+      ...user,
+      cpf:
+        user.cpf && user.cpf.includes(":")
+          ? decrypt(user.cpf)
+          : user.cpf,
+    });
   } catch (error) {
     console.error("ERRO ME:", error);
     return res.status(500).json({ error: "Erro interno" });
@@ -35,7 +82,6 @@ export async function me(req: Request, res: Response) {
 /**
  * PUT — atualizar dados do usuário logado
  */
-
 export async function updateMe(req: Request, res: Response) {
   try {
     const userId = req.user!.id;
@@ -67,8 +113,9 @@ export async function updateMe(req: Request, res: Response) {
       dataToUpdate.email = String(email);
     }
 
+    // 🔐 CPF CRIPTOGRAFADO
     if (cpf !== undefined) {
-      dataToUpdate.cpf = String(cpf);
+      dataToUpdate.cpf = encrypt(String(cpf));
     }
 
     if (proximoPagamento !== undefined) {
@@ -123,14 +170,22 @@ export async function updateMe(req: Request, res: Response) {
       },
     });
 
-    return res.json(updatedUser);
+    return res.json({
+      ...updatedUser,
+      cpf:
+        updatedUser?.cpf && updatedUser.cpf.includes(":")
+          ? decrypt(updatedUser.cpf)
+          : updatedUser?.cpf,
+    });
   } catch (error) {
     console.error("ERRO UPDATE ME:", error);
     return res.status(500).json({ error: "Erro interno" });
   }
 }
 
-
+/**
+ * DELETE IMAGE
+ */
 export async function removeMyImage(req: Request, res: Response) {
   try {
     const userId = req.user!.id;

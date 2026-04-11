@@ -2,10 +2,51 @@ import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { uploadImageToFirebase } from "../utils/uploadImage";
 import { deleteImageFromFirebase } from "../utils/deleteImage";
+import crypto from "crypto";
 
-/**
- * CREATE
- */
+/* =========================
+   🔐 CRIPTO
+========================= */
+
+const algorithm = "aes-256-cbc";
+const secret = process.env.CRYPTO_SECRET || "chave-super-secreta";
+
+const key = crypto.createHash("sha256").update(secret).digest();
+
+function encrypt(text: string) {
+  if (!text) return text;
+
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+
+  let encrypted = cipher.update(text, "utf8", "hex");
+  encrypted += cipher.final("hex");
+
+  return iv.toString("hex") + ":" + encrypted;
+}
+
+function decrypt(hash: string) {
+  try {
+    if (!hash || !hash.includes(":")) return hash;
+
+    const [ivHex, encryptedText] = hash.split(":");
+
+    const iv = Buffer.from(ivHex, "hex");
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+
+    let decrypted = decipher.update(encryptedText, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+
+    return decrypted;
+  } catch {
+    return hash;
+  }
+}
+
+/* =========================
+   CREATE
+========================= */
+
 export async function createCliente(req: Request, res: Response) {
   try {
     const { nome, telefone, cpf, rg, userId } = req.body;
@@ -17,7 +58,6 @@ export async function createCliente(req: Request, res: Response) {
 
     let imagemUrl: string | undefined;
 
-    // 🔥 Se enviou imagem, sobe pro Firebase
     if (req.file) {
       imagemUrl = await uploadImageToFirebase(req.file);
     }
@@ -31,23 +71,28 @@ export async function createCliente(req: Request, res: Response) {
       data: {
         nome,
         telefone,
-        cpf,
-        rg,
+        cpf: encrypt(cpf),
+        rg: encrypt(rg),
         imagemUrl,
         userId: ownerId,
       },
     });
 
-    return res.status(201).json(cliente);
+    return res.status(201).json({
+      ...cliente,
+      cpf,
+      rg,
+    });
   } catch (error) {
     console.error("ERRO CREATE CLIENTE:", error);
     return res.status(500).json({ error: "Erro ao criar cliente" });
   }
 }
 
-/**
- * LIST
- */
+/* =========================
+   LIST
+========================= */
+
 export async function listClientes(req: Request, res: Response) {
   try {
     const clientes = await prisma.cliente.findMany({
@@ -61,16 +106,23 @@ export async function listClientes(req: Request, res: Response) {
       },
     });
 
-    return res.json(clientes);
+    const formatted = clientes.map((c) => ({
+      ...c,
+      cpf: c.cpf && c.cpf.includes(":") ? decrypt(c.cpf) : c.cpf,
+      rg: c.rg && c.rg.includes(":") ? decrypt(c.rg) : c.rg,
+    }));
+
+    return res.json(formatted);
   } catch (error) {
     console.error("ERRO LIST CLIENTES:", error);
     return res.status(500).json({ error: "Erro ao listar clientes" });
   }
 }
 
-/**
- * DETAIL
- */
+/* =========================
+   DETAIL
+========================= */
+
 export async function getClienteById(
   req: Request<{ id: string }>,
   res: Response
@@ -94,18 +146,27 @@ export async function getClienteById(
       return res.status(404).json({ error: "Cliente não encontrado" });
     }
 
-    return res.json(cliente);
+    return res.json({
+      ...cliente,
+      cpf:
+        cliente.cpf && cliente.cpf.includes(":")
+          ? decrypt(cliente.cpf)
+          : cliente.cpf,
+      rg:
+        cliente.rg && cliente.rg.includes(":")
+          ? decrypt(cliente.rg)
+          : cliente.rg,
+    });
   } catch (error) {
     console.error("ERRO DETAIL CLIENTE:", error);
     return res.status(500).json({ error: "Erro ao buscar cliente" });
   }
 }
 
-/**
- * UPDATE
- * 🔥 Mantém regra antiga
- * 🔥 Se trocar imagem, apaga a antiga do Firebase
- */
+/* =========================
+   UPDATE
+========================= */
+
 export async function updateCliente(
   req: Request<{ id: string }>,
   res: Response
@@ -132,9 +193,7 @@ export async function updateCliente(
 
     let imagemUrl = cliente.imagemUrl;
 
-    // 🔥 Se enviou nova imagem
     if (req.file) {
-      // 🔥 Deleta antiga se existir
       if (cliente.imagemUrl) {
         await deleteImageFromFirebase(cliente.imagemUrl);
       }
@@ -147,24 +206,34 @@ export async function updateCliente(
       data: {
         nome,
         telefone,
-        cpf,
-        rg,
+        cpf: cpf ? encrypt(cpf) : cliente.cpf,
+        rg: rg ? encrypt(rg) : cliente.rg,
         imagemUrl,
         userId,
       },
     });
 
-    return res.json(updated);
+    return res.json({
+      ...updated,
+      cpf:
+        updated.cpf && updated.cpf.includes(":")
+          ? decrypt(updated.cpf)
+          : updated.cpf,
+      rg:
+        updated.rg && updated.rg.includes(":")
+          ? decrypt(updated.rg)
+          : updated.rg,
+    });
   } catch (error) {
     console.error("ERRO UPDATE CLIENTE:", error);
     return res.status(500).json({ error: "Erro ao atualizar cliente" });
   }
 }
 
-/**
- * DELETE
- * 🔥 Apaga imagem do Firebase junto
- */
+/* =========================
+   DELETE
+========================= */
+
 export async function deleteCliente(
   req: Request<{ id: string }>,
   res: Response
@@ -188,7 +257,6 @@ export async function deleteCliente(
       return res.status(403).json({ error: "Acesso negado" });
     }
 
-    // 🔥 Apaga imagem do Firebase se existir
     if (cliente.imagemUrl) {
       await deleteImageFromFirebase(cliente.imagemUrl);
     }
