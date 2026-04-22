@@ -12,7 +12,7 @@ export async function checkPayments() {
     const diffMs = user.proximoPagamento.getTime() - hoje.getTime();
     const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-    // BLOQUEADO se atrasou
+    // 🔴 BLOQUEADO se atrasou
     if (diffDias <= 0 && user.status !== AccountStatus.BLOQUEADO) {
       await prisma.user.update({
         where: { id: user.id },
@@ -20,11 +20,11 @@ export async function checkPayments() {
       });
     }
 
-    // AVISO se falta até 7 dias
-    if (diffDias > 0 && diffDias <= 7 && user.status === AccountStatus.ATIVO) {
+    // 🟢 VOLTA PRA ATIVO se ainda não venceu (caso tenha sido bloqueado antes)
+    if (diffDias > 0 && user.status !== AccountStatus.ATIVO) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { status: AccountStatus.AVISO },
+        data: { status: AccountStatus.ATIVO },
       });
     }
   }
