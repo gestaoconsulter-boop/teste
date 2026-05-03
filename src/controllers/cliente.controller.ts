@@ -49,26 +49,32 @@ function decrypt(hash: string) {
 
 export async function createCliente(req: Request, res: Response) {
   try {
-    const { nome, telefone, cpf, rg, userId } = req.body;
-    const loggedUser = req.user!;
+    const {
+      nome,
+      telefone,
+      cpf,
+      rg,
+      userId,
+      apelido,
+      observacao,
+    } = req.body;
 
-    console.log("📦 BODY:", req.body);           // 🔥 debug
-    console.log("📸 FILE:", req.file);           // 🔥 debug
+    const loggedUser = req.user!;
 
     if (!nome) {
       return res.status(400).json({ error: "Nome é obrigatório" });
     }
 
+    if (observacao && observacao.length > 250) {
+      return res.status(400).json({
+        error: "Observação deve ter no máximo 250 caracteres",
+      });
+    }
+
     let imagemUrl: string | undefined;
 
     if (req.file) {
-      console.log("🚀 Enviando imagem pro Firebase..."); // 🔥 debug
-
       imagemUrl = await uploadImageToFirebase(req.file);
-
-      console.log("✅ URL GERADA:", imagemUrl); // 🔥 debug
-    } else {
-      console.log("❌ Nenhuma imagem recebida"); // 🔥 debug
     }
 
     const ownerId =
@@ -84,6 +90,8 @@ export async function createCliente(req: Request, res: Response) {
         rg: encrypt(rg),
         imagemUrl,
         userId: ownerId,
+        apelido,
+        observacao,
       },
     });
 
@@ -182,7 +190,16 @@ export async function updateCliente(
 ) {
   try {
     const { id } = req.params;
-    const { nome, telefone, cpf, rg, userId } = req.body;
+    const {
+      nome,
+      telefone,
+      cpf,
+      rg,
+      userId,
+      apelido,
+      observacao,
+    } = req.body;
+
     const loggedUser = req.user!;
 
     const cliente = await prisma.cliente.findUnique({
@@ -198,6 +215,12 @@ export async function updateCliente(
       cliente.userId !== loggedUser.id
     ) {
       return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    if (observacao && observacao.length > 250) {
+      return res.status(400).json({
+        error: "Observação deve ter no máximo 250 caracteres",
+      });
     }
 
     let imagemUrl = cliente.imagemUrl;
@@ -219,6 +242,8 @@ export async function updateCliente(
         rg: rg ? encrypt(rg) : cliente.rg,
         imagemUrl,
         userId,
+        apelido,
+        observacao,
       },
     });
 
