@@ -42,6 +42,9 @@ model Cliente {
   rg        String?
   telefone  String?
   imagemUrl String?
+  apelido     String?   
+  observacao  String?  
+
 
   criadoEm  DateTime @default(now())
   

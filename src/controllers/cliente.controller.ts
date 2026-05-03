@@ -190,6 +190,7 @@ export async function updateCliente(
 ) {
   try {
     const { id } = req.params;
+
     const {
       nome,
       telefone,
